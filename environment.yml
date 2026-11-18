@@ -1,0 +1,17 @@
+name: battery-eol
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - python=3.11
+  - numpy
+  - pandas
+  - scipy
+  - matplotlib
+  - scikit-learn
+  - pytest
+  - snakemake
+  - six
+  - pip
+  - pip:
+      - kaggle
