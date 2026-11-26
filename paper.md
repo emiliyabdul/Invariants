@@ -76,6 +76,4 @@ wtd_range_atomic_mass (269), std_FusionHeat (269), wtd_mean_Density (252).
 
 ---
 
-## 3.2 eda — TODO
 
-## 3.3 preprocess — TODO
