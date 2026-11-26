@@ -6,6 +6,7 @@ data/raw/*
 !data/raw/.gitkeep
 results/data/
 results/logs/
+results/eda/
 
 # IDEs / editors
 .idea/
