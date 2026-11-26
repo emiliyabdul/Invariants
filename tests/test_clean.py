@@ -1,1 +1,50 @@
 """Tests for src/load_clean.py."""
+import numpy as np
+import pandas as pd
+import pytest
+
+from src.load_clean import TARGET, clean, drop_constant_columns, drop_duplicates, flag_extremes, load_raw
+
+
+@pytest.fixture
+def raw():
+    return pd.DataFrame({
+        "a": [1.0, 2.0, 2.0, 3.0, np.nan],
+        "b": [5.0, 6.0, 6.0, 7.0, 8.0],
+        "const": [1.0] * 5,
+        TARGET: [10.0, 20.0, 20.0, 30.0, 40.0],
+    })
+
+
+def test_duplicates_removed_columns_kept(raw):
+    out, entry = drop_duplicates(raw)
+    assert not out.duplicated().any()
+    assert list(out.columns) == list(raw.columns)
+    assert entry["rows_removed"] == 1
+
+
+def test_constant_column_dropped_and_logged(raw):
+    out, entry = drop_constant_columns(raw)
+    assert "const" not in out.columns
+    assert TARGET in out.columns
+    assert "const" in entry["detail"]
+
+
+def test_no_silent_row_loss(raw):
+    out, log = clean(raw)
+    assert len(raw) - len(out) == log["rows_removed"].sum()
+    assert len(out) == 3  # one NaN row, one duplicate
+
+
+def test_extremes_flagged_not_removed():
+    df = pd.DataFrame({"x": [0.0] * 50 + [1000.0], TARGET: range(51)})
+    out, entry = flag_extremes(df)
+    assert len(out) == len(df)
+    assert entry["detail"].startswith("1 values")
+
+
+def test_load_raw_requires_target(tmp_path):
+    p = tmp_path / "bad.csv"
+    pd.DataFrame({"a": [1]}).to_csv(p, index=False)
+    with pytest.raises(ValueError):
+        load_raw(p)
