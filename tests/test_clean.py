@@ -4,7 +4,7 @@ import pandas as pd
 import pytest
 
 from src.load_clean import (TARGET, clean, drop_constant_columns, drop_duplicates, flag_extremes, load_raw,
-                            merge_repeated_materials)
+                            merge_repeated_materials, sensitivity)
 
 
 @pytest.fixture
@@ -58,3 +58,12 @@ def test_load_raw_requires_target(tmp_path):
     pd.DataFrame({"a": [1]}).to_csv(p, index=False)
     with pytest.raises(ValueError):
         load_raw(p)
+
+
+def test_sensitivity_compares_median_and_mean():
+    df = pd.DataFrame({"a": [1.0, 1.0, 1.0, 2.0], TARGET: [10.0, 20.0, 60.0, 5.0]})
+    sens = sensitivity(df).set_index("check")
+    assert sens.loc["merge with median", "tc_max"] == 20.0
+    assert sens.loc["merge with mean", "tc_max"] == 30.0
+    assert sens.loc["repeated materials where |mean - median| > 5 K", "n_rows"] == 1
+    assert len(df) == 4  # input is not modified
