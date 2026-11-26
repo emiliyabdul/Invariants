@@ -67,9 +67,26 @@ wtd_std_FusionHeat (206), wtd_range_atomic_mass (202), std_FusionHeat (191).
 - **Nothing is removed silently:** each step logs what it removed
   (`results/logs/cleaning_log.csv`), and a test checks rows removed = rows logged.
 
-### Tests (`tests/test_clean.py`, 6 tests, all passing)
+### Sensitivity check: do the judgment calls change the data?
+Two choices in this stage have no single right answer, so both were tested
+(`results/logs/sensitivity.csv`, produced by the same script):
+
+| Check | Result |
+|---|---|
+| Merge repeated materials with **median** vs **mean** Tc | Practically identical: Tc mean 33.63 vs 33.60 K, median 19.0 vs 19.1 K, max 143 K, skew 0.88, share below 10 K 37.5% and at 70–100 K 17.9% in both |
+| Repeated materials where mean and median differ by > 5 K | 68 of 2,374 (2.9%) |
+| Values flagged at \|z\| > 3 / 4 / 5 | 11,979 / 3,440 / 1,097 |
+
+**Conclusion:** the median-vs-mean choice does not change any downstream number, so the
+result does not depend on it; the median is kept because it is robust to the few
+materials (2.9%) whose measurements disagree. The \|z\| threshold only changes how many
+values are *flagged*; nothing is removed at any threshold, so it has no effect on the data
+used by later stages.
+
+### Tests (`tests/test_clean.py`, 7 tests, all passing)
 - Duplicates removed, all columns kept.
 - Repeated materials merged into one row with the median target.
+- Sensitivity check compares median and mean correctly and does not modify the input.
 - Constant column dropped and recorded in the log.
 - Rows removed equal rows logged (no silent data loss).
 - Extreme values flagged but not removed.
@@ -120,6 +137,12 @@ Outputs are gitignored; they regenerate from the cleaned data.
 | Feature scales differ by orders of magnitude. | std from 0.28 (wtd_entropy_ElectronAffinity) to 4,097 (range_Density), ratio ≈ 14,500× | K-means uses Euclidean distance, so without scaling a few large-unit features would dominate. **Standardise all features** in 3.3. |
 | Features are correlated, mostly in blocks within the same property (the 10 statistics of one property move together), plus some blocks across properties (e.g. atomic mass and density). | 5.1% of feature pairs have \|r\| > 0.8, 2.1% have \|r\| > 0.9; mean \|r\| 0.47 within a property vs 0.33 across | Redundant features get extra weight in distances, so **PCA (option K2)** is reasonable. The explained-variance curve in 3.3 confirms how many components are needed. |
 | Individual features are skewed and several are multimodal (e.g. mean_Valence takes a few discrete levels, mean_FusionHeat and mean_Density have long right tails). | see `feature_distributions.pdf` | Supports keeping extreme values (3.1) and relying on standardisation + PCA rather than deleting points. |
+
+### Tests (`tests/test_eda.py`, 6 tests, all passing)
+- Summary numbers are correct on a hand-built table (correlated pair share, std ratio,
+  median, skew sign).
+- The target is excluded from the feature statistics.
+- Each of the 4 plot functions writes a valid PDF.
 
 ### Notes for the writer
 - The bimodal target is worth one sentence in the Results: it hints at two broad groups of
