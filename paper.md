@@ -131,4 +131,72 @@ Outputs are gitignored; they regenerate from the cleaned data.
 - Overall correlation is moderate (only ~5% of pairs above 0.8), so do not overstate
   redundancy; the strong part is within each property's block.
 
-## 3.3 preprocess — TODO
+---
+
+## 3.3 preprocess — DONE
+
+**Feeds paper sections:** Methods (preprocessing), Results (PCA variance figure).
+
+### What it is for
+Turn the cleaned table into the matrices k-means will use. K-means measures Euclidean
+distance, so features must be on the same scale, and redundant features should not get
+extra weight. The target is kept out so clusters cannot be built from it (circularity).
+
+### How to reproduce
+```
+python -m src.preprocess   # reads results/data/clean.csv
+```
+Outputs are gitignored; they regenerate from the cleaned data.
+
+### Outputs
+| File | Content | Used by |
+|---|---|---|
+| `results/data/X_scaled.npy` | 15,170 × 81 standardised features (mean 0, std 1) | clustering option **K1** (comparison variant in stability) |
+| `results/data/X_pca.npy` | 15,170 × 12 PCA scores | clustering option **K2** (default) |
+| `results/data/y.npy` | 15,170 critical temperatures | **only** stats_tests (3.6) |
+| `results/preprocess/pca_variance.pdf` | cumulative explained-variance curve | paper figure |
+| `results/preprocess/pca_info.json` | component count, variance, seed, top loadings | numbers below |
+
+**All files keep the row order of `clean.csv`.** Cluster labels are matched to `y` by position.
+
+### What was done and the results
+| Step | Choice | Result |
+|---|---|---|
+| Split | Target removed from the feature matrix (asserted in code and tested) | 81 features, target stored separately |
+| Scale | `StandardScaler` on all 81 features | every feature mean 0, std 1 |
+| PCA | Smallest number of components explaining ≥ 90% variance (rule fixed in advance) | **12 components, 90.9% variance** |
+| Seed | `random_state = 42` | PCA output identical across runs (tested) |
+
+Other variance levels for reference: 7 components = 80%, 12 = 90%, 17 = 95%.
+PC1 + PC2 explain 49.8%, so a 2D scatter coloured by cluster shows about half the variance.
+
+### What the main components mean (top loadings)
+- **PC1 (~40% of variance):** range/std/entropy of ionisation energy and atomic radius, i.e.
+  **how different the elements in a material are from each other** (compositional spread).
+- **PC2:** fusion heat spread and mean atomic radius, i.e. **which kind of elements** are present.
+- **PC3:** entropy of several properties, i.e. **how evenly the elements are mixed**.
+These help the cluster stage describe what separates the families.
+
+### Decisions and why
+- **Standardise all features:** EDA showed scales differing ~14,500×; without scaling,
+  range_Density alone would dominate the distances.
+- **PCA to 12 components:** the curve rises steeply and flattens after ~12 components, so
+  81 correlated features compress to 12 with little loss (81 → 12, 90.9% kept). This removes
+  redundancy (EDA: strong within-property correlation) and noise.
+- **90% threshold** chosen before seeing the curve (common convention), not tuned.
+- **Scaler fitted on all rows:** clustering is unsupervised, there is no train/test split,
+  so there is no leakage.
+- **Target never enters the clustering input** (plan section 5, circularity).
+
+### Tests (`tests/test_preprocess.py`, 4 tests, all passing)
+- Target column absent from the clustering input.
+- Scaled features have mean ≈ 0 and std ≈ 1.
+- PCA picks the smallest number of components reaching the threshold.
+- Same seed gives identical PCA output.
+
+### Figures for the paper
+- `pca_variance.pdf`: justifies the component count (Methods).
+
+### Notes for the cluster stage
+- Use `X_pca.npy` for K2 (default) and `X_scaled.npy` for K1 (stability comparison).
+- Do **not** load `y.npy` before 3.6.
