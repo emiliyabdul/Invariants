@@ -4,6 +4,8 @@ __pycache__/
 .snakemake/
 data/raw/*
 !data/raw/.gitkeep
+results/data/
+results/logs/
 
 # IDEs / editors
 .idea/
