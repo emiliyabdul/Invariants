@@ -3,7 +3,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.load_clean import TARGET, clean, drop_constant_columns, drop_duplicates, flag_extremes, load_raw
+from src.load_clean import (TARGET, clean, drop_constant_columns, drop_duplicates, flag_extremes, load_raw,
+                            merge_repeated_materials)
 
 
 @pytest.fixture
@@ -34,6 +35,15 @@ def test_no_silent_row_loss(raw):
     out, log = clean(raw)
     assert len(raw) - len(out) == log["rows_removed"].sum()
     assert len(out) == 3  # one NaN row, one duplicate
+
+
+def test_repeated_materials_merged_with_median():
+    df = pd.DataFrame({"a": [1.0, 1.0, 1.0, 2.0], TARGET: [10.0, 20.0, 60.0, 5.0]})
+    out, entry = merge_repeated_materials(df)
+    assert len(out) == 2
+    assert out.loc[out["a"] == 1.0, TARGET].item() == 20.0
+    assert list(out.columns) == list(df.columns)
+    assert entry["rows_removed"] == 2
 
 
 def test_extremes_flagged_not_removed():

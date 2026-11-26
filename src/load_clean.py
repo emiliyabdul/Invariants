@@ -42,6 +42,16 @@ def drop_duplicates(df):
     return out, _entry("drop_duplicates", len(df) - len(out), 0, "exact duplicate rows")
 
 
+def merge_repeated_materials(df):
+    """Rows with identical features are the same material measured several times:
+    keep one row per material with the median target, so each material counts once."""
+    feats = [c for c in df.columns if c != TARGET]
+    out = df.groupby(feats, sort=False, as_index=False)[TARGET].median()[df.columns]
+    repeated = df.duplicated(subset=feats, keep=False).sum()
+    detail = f"{repeated} rows shared features with another row; merged into {repeated - (len(df) - len(out))} materials (median {TARGET})"
+    return out, _entry("merge_repeated_materials", len(df) - len(out), 0, detail)
+
+
 def drop_constant_columns(df):
     const = [c for c in df.columns if df[c].nunique(dropna=False) <= 1 and c != TARGET]
     out = df.drop(columns=const)
@@ -62,7 +72,7 @@ def flag_extremes(df, z=Z_THRESHOLD):
 def clean(df):
     """Run every step in order. Returns (clean DataFrame, log DataFrame)."""
     log = [_entry("load_raw", 0, 0, f"{df.shape[0]} rows x {df.shape[1]} columns")]
-    for step in (drop_missing, drop_duplicates, drop_constant_columns, flag_extremes):
+    for step in (drop_missing, drop_duplicates, merge_repeated_materials, drop_constant_columns, flag_extremes):
         df, entry = step(df)
         log.append(entry)
     log.append(_entry("result", 0, 0, f"{df.shape[0]} rows x {df.shape[1]} columns"))
