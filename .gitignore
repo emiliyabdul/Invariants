@@ -2,4 +2,26 @@ __pycache__/
 *.pyc
 .pytest_cache/
 .snakemake/
-data/raw/
+data/raw/*
+!data/raw/.gitkeep
+
+# IDEs / editors
+.idea/
+.vscode/
+*.swp
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Python
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+.env
+.ipynb_checkpoints/
+.coverage
+htmlcov/
