@@ -1,6 +1,6 @@
 """Target/feature distributions, feature scales, correlation matrix.
 
-Each figure supports one method decision (written in paper.md, section 3.2):
+Each figure supports one method decision (written in PAPER.md, section 3.2):
 target shape -> parametric vs rank-based tests, feature scales -> standardisation,
 correlations -> PCA.
 """

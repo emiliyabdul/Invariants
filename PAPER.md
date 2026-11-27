@@ -3,6 +3,34 @@
 Information from each pipeline stage that the paper needs: what was done, why, results,
 and where the files are. This is not the paper text.
 
+## Project overview
+
+**Research question.** Do superconducting materials fall into natural families according
+to their features, and do those families differ in critical temperature (Tc)? Robustness
+part: is the family structure stable under a different random seed, sample, or
+preprocessing route?
+
+**Logic of the pipeline.**
+1. *Explore:* cluster materials with k-means on their features only; Tc is hidden.
+2. *Check:* re-run the clustering under different seeds, bootstrap samples and K1 vs K2,
+   and measure agreement (adjusted Rand index).
+3. *Test:* only if the groups are stable, test whether their Tc differs and how much.
+4. *Interpret:* what the groups mean and do not mean.
+
+**Why Tc is hidden while clustering.** If Tc were used to build the groups, finding that
+the groups differ in Tc would be circular: the difference would be created by the method.
+Tc is therefore kept out of every clustering input and only used in 3.6.
+
+| Stage | Status | Main output |
+|---|---|---|
+| 3.1 load_clean | done | `results/data/clean.csv` (15,170 materials) |
+| 3.2 eda | done | figures justifying scaling, PCA and the test choice |
+| 3.3 preprocess | done | `X_pca.npy` (K2), `X_scaled.npy` (K1), `y.npy` |
+| 3.4 cluster | to do | labels, k chosen by elbow + silhouette |
+| 3.5 stability | to do | ARI across seeds, bootstrap, K1 vs K2 |
+| 3.6 stats_tests | to do | Kruskal-Wallis / permutation test, effect sizes, CIs |
+| 3.7 figures_tables | to do | every figure and table in the paper |
+
 ---
 
 ## 3.1 load_clean — DONE
@@ -49,6 +77,37 @@ Outputs are gitignored; they regenerate from the raw data.
 Columns with the most extreme values: range_FusionHeat (251), wtd_range_Density (210),
 wtd_std_FusionHeat (206), wtd_range_atomic_mass (202), std_FusionHeat (191).
 
+### Row count, step by step
+| Step | Rows |
+|---|---|
+| Raw data | 21,263 |
+| − 66 exact duplicates (same features **and** same Tc) | 21,197 |
+| Of these, 8,401 rows share their features with at least one other row but have a different Tc. They form 2,374 groups; each group is one material measured several times (2 to 110 times; most often 2). | |
+| Each group becomes one row (median Tc): 8,401 − 2,374 = 6,027 rows fewer | |
+| **Final** = 21,263 − 66 − 8,401 + 2,374 | **15,170** |
+
+The 15,170 materials are 2,374 that were measured more than once and 12,796 that appeared
+only once. Every row is now one unique material.
+
+### What |z| > 4 means and why extreme values are kept
+- **z-score:** z = (value − mean) / standard deviation, i.e. how many standard deviations a
+  value lies from the column mean. |z| > 4 is a strict cut-off: in normally distributed
+  data only about 1 value in 16,000 lies that far out.
+- **3,440 is a count of cells, not rows.** The data has 15,170 × 81 = 1,228,770 feature
+  values; 3,440 of them (**0.28%**) are flagged. They sit in **1,343 materials (8.9%)**, which
+  have at least one flagged value.
+- **Why more than a normal distribution predicts** (about 78 expected vs 3,440 observed):
+  many features have long right tails (EDA, `feature_distributions.pdf`), so far-out
+  values are a property of the data, not a sign of errors.
+- **Why they are kept:** an outlier is removed when it is an *error* (e.g. a negative mass).
+  Here the features are *computed from the chemical formula*, not measured by an
+  instrument, so an extreme value cannot be a measurement error: it describes a real
+  material made of unusual elements. Deleting them would remove 8.9% of the materials,
+  and unusual materials may form a family of their own, which is what the project looks
+  for. K-means is sensitive to extreme points, so their influence is reduced instead by
+  standardisation and PCA (3.3).
+- The flag exists to document that these values were seen and kept on purpose.
+
 ### Decisions and why (for the Methods/Dataset text)
 - **Duplicates removed:** an exact copy of a row adds no information but would make a
   cluster look bigger and a test look more confident than it is.
@@ -60,9 +119,10 @@ wtd_std_FusionHeat (206), wtd_range_atomic_mass (202), std_FusionHeat (191).
   The **median** Tc is used because it is robust to one outlying measurement. Side effect:
   the maximum Tc drops from 185 K to 143 K, because the 185 K value was one of several
   measurements of a material whose median is lower.
-- **Extreme values kept, not deleted:** they are real measurements, not entry errors.
-  Removing them could delete materials with unusual compositions, which may be a family of
-  their own. Their effect on k-means is reduced later by standardisation and PCA (3.3).
+- **Extreme values kept, not deleted:** the features are computed from the chemical
+  formula, so an extreme value is a real but unusual material, not an error. Removing them
+  could delete materials with unusual compositions, which may be a family of their own.
+  Their effect on k-means is reduced later by standardisation and PCA (3.3). Details above.
 - **|z| > 4 threshold** was chosen before looking at the results, not tuned.
 - **Nothing is removed silently:** each step logs what it removed
   (`results/logs/cleaning_log.csv`), and a test checks rows removed = rows logged.
@@ -223,3 +283,24 @@ These help the cluster stage describe what separates the families.
 ### Notes for the cluster stage
 - Use `X_pca.npy` for K2 (default) and `X_scaled.npy` for K1 (stability comparison).
 - Do **not** load `y.npy` before 3.6.
+
+---
+
+## What stages 3.1–3.3 tell us so far
+
+**Quality of the data work (evidence):**
+- Every number above was recomputed with independent code and matches.
+- A fresh clone regenerates all outputs byte-for-byte identically (seed 42, deterministic steps).
+- 17 tests pass (7 cleaning, 6 EDA, 4 preprocessing).
+- Both judgment calls (median vs mean, |z| threshold) were tested and do not change the data.
+
+**What the data suggests for the research question (promising, not yet proof):**
+- **Tc is bimodal** (37% below 10 K, 17% at 70–100 K): a sign that low-Tc and high-Tc
+  groups of materials may exist.
+- **PCA compresses 81 features to 12 with 90.9% of the variance kept**, so the feature
+  space has strong structure, which is good for k-means.
+- **Not yet known:** whether real, stable families exist. K-means always returns k groups,
+  even when there is no structure. Stability (3.5) and the Tc tests (3.6) answer this.
+
+**Limitations carried forward:** chemically very similar materials (e.g. small doping
+changes) are still separate rows, so independence is improved but not perfect.
