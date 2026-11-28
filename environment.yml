@@ -1,4 +1,4 @@
-name: battery-eol
+name: invariants
 channels:
   - conda-forge
   - bioconda
@@ -14,4 +14,4 @@ dependencies:
   - six
   - pip
   - pip:
-      - kaggle
+      - kagglehub
